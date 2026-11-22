@@ -1,0 +1,89 @@
+name: Build APK
+
+# 手动触发:填一个版本号(同时也是 tag 名)。
+# 重复跑同一版本号会覆盖式重建 tag 与 release(旧的 tag/release 会被替换)。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 / tag,例如 0.1.0 或 v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ inputs.version }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 解析版本号
+        id: v
+        run: |
+          RAW="${{ inputs.version }}"
+          # tag 与版本号一致:去空白,去掉可能带的前缀 v 作为 versionName,保留原样作为 tag
+          TAG="$(echo "$RAW" | tr -d '[:space:]')"
+          if [ -z "$TAG" ]; then
+            echo "版本号不能为空" >&2
+            exit 1
+          fi
+          NAME="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG versionName=$NAME"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: 写入版本号
+        run: |
+          sed -i "s/versionName = \"[^\"]*\"/versionName = \"${{ steps.v.outputs.name }}\"/" app/build.gradle.kts
+          sed -i "s/versionCode = [0-9]*/versionCode = ${{ github.run_number }}/" app/build.gradle.kts
+          grep -E 'versionName|versionCode' app/build.gradle.kts
+
+      - name: 构建
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: 归档 APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/subscribe-meter-${{ steps.v.outputs.name }}.apk"
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ steps.v.outputs.tag }}
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: 覆盖式创建 tag
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 已存在就强制移动,实现覆盖式重建
+          git tag -f "${{ steps.v.outputs.tag }}"
+          git push -f origin "refs/tags/${{ steps.v.outputs.tag }}"
+
+      - name: 覆盖式创建 release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.v.outputs.tag }}"
+          # 先删旧 release(不存在则忽略),再重建 —— 保证同一版本号可重复发布
+          gh release delete "$TAG" --yes --cleanup-tag=false || true
+          gh release create "$TAG" "dist/subscribe-meter-${{ steps.v.outputs.name }}.apk" \
+            --title "$TAG" \
+            --notes "订阅额度看板 $TAG" \
+            --target "${GITHUB_SHA}"
