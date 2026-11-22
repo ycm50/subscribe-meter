@@ -1,0 +1,17 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+tmpscripts/
+
+# 签名材料一律不入库
+keystore.jks
+*.jks
+*.keystore

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自建 new-api / one-api 网关常只跑明文 HTTP,因此这里允许明文流量;
+     公网明文的安全提示由应用内「网络」设置页负责告知。 -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
