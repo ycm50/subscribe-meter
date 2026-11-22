@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 / tag,例如 0.1.0 或 v0.1.0'
+        description: '版本号 / tag,例如 0.2.0 或 v0.2.0'
         required: true
         type: string
 
@@ -25,7 +25,6 @@ jobs:
         id: v
         run: |
           RAW="${{ inputs.version }}"
-          # tag 与版本号一致:去空白,去掉可能带的前缀 v 作为 versionName,保留原样作为 tag
           TAG="$(echo "$RAW" | tr -d '[:space:]')"
           if [ -z "$TAG" ]; then
             echo "版本号不能为空" >&2
@@ -54,7 +53,7 @@ jobs:
           grep -E 'versionName|versionCode' app/build.gradle.kts
 
       - name: 构建
-        run: gradle :app:assembleDebug --no-daemon
+        run: ./gradlew :app:assembleDebug --no-daemon
 
       - name: 归档 APK
         run: |
@@ -72,7 +71,6 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # 已存在就强制移动,实现覆盖式重建
           git tag -f "${{ steps.v.outputs.tag }}"
           git push -f origin "refs/tags/${{ steps.v.outputs.tag }}"
 
@@ -81,7 +79,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.v.outputs.tag }}"
-          # 先删旧 release(不存在则忽略),再重建 —— 保证同一版本号可重复发布
           gh release delete "$TAG" --yes --cleanup-tag=false || true
           gh release create "$TAG" "dist/subscribe-meter-${{ steps.v.outputs.name }}.apk" \
             --title "$TAG" \
