@@ -33,7 +33,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 全量压缩:代码压缩 + 混淆 + 资源裁剪(AGP 8 默认 full mode)
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // 有签名库就用它签名;没有则退化为 debug 签名(仅本地临时用)。
             signingConfig = if (signingConfigs.getByName("release").storeFile != null) {
