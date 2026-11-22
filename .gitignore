@@ -10,3 +10,8 @@ captures/
 *.apk
 *.aab
 tmpscripts/
+
+# 签名材料一律不入库
+keystore.jks
+*.jks
+*.keystore

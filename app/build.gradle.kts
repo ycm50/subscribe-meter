@@ -17,10 +17,30 @@ android {
         versionName = "0.1.0"
     }
 
+    // 发布签名:本地用 keystore.jks / CI 用 Secrets 注入的同名文件,两者都不入库。
+    signingConfigs {
+        create("release") {
+            val storePath = System.getenv("SIGNING_STORE_FILE") ?: "keystore.jks"
+            val store = rootProject.file(storePath)
+            if (store.exists()) {
+                storeFile = store
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD") ?: "123456"
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "key0"
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: "123456"
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // 有签名库就用它签名;没有则退化为 debug 签名(仅本地临时用)。
+            signingConfig = if (signingConfigs.getByName("release").storeFile != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 
